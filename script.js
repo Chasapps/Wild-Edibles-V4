@@ -1,46 +1,117 @@
+let map, pickerMap, pickerMarker;
+const addBtn=document.getElementById('addBtn');
+const locateBtn=document.getElementById('locateBtn');
+const dialogEl=document.getElementById('formDialog');
+const form=document.getElementById('treeForm');
+const formCategory=document.getElementById('formCategory');
+const fruitSelect=document.getElementById('fruitSelect');
+const fruitCustom=document.getElementById('fruitCustom');
+const notes=document.getElementById('notes');
+const latInput=document.getElementById('lat');
+const lngInput=document.getElementById('lng');
+const addressSearch=document.getElementById('addressSearch');
+const useMyLocBtn=document.getElementById('useMyLocBtn');
+const cancelBtn=document.getElementById('cancelBtn');
 
-/* CATFIX4 */
-const LS_KEY='wild_fruit_trees_v1', MASTER_LS_KEY='wild_fruit_master_v1';
-const FRUIT_EMOJI={Apple:'🍎',Pear:'🍐',Plum:'🍑',Peach:'🍑',Apricot:'🍑',Orange:'🍊',Grapefruit:'🍊',Lemon:'🍋',Lime:'🍈',Mulberry:'🫐',Berry:'🫐',Fig:'🟣',Olive:'🫒',Loquat:'🍑',Cherry:'🍒',Banana:'🍌',Mango:'🥭',Guava:'🥭',Feijoa:'🥝',Persimmon:'🟠',Other:'🌱',Pomegranate:'🔴'};
-const DEFAULT_CATALOG={native_fruits:[{name:'Finger Lime',emoji:'🍈'},{name:'Kakadu Plum',emoji:'🍏'},{name:'Riberry (Lilly Pilly)',emoji:'🍒'},{name:'Quandong (Native Peach)',emoji:'🍒'},{name:'Muntries',emoji:'🍇'},{name:'Midyim Berry',emoji:'🍓'},{name:'Desert Lime',emoji:'🍋'}],common_fruits:[{name:'Mulberry',emoji:'🍇'},{name:'Loquat',emoji:'🍑'},{name:'Avocado',emoji:'🥑'},{name:'Mango',emoji:'🥭'},{name:'Banana',emoji:'🍌'},{name:'Fig',emoji:'🟣'},{name:'Olive',emoji:'🫒'}],edible_plants:[{name:'Warrigal Greens',emoji:'🥬'},{name:'Lemon Myrtle',emoji:'🌿'},{name:'River Mint',emoji:'🌿'},{name:'Saltbush',emoji:'🌿'}]};
-let MASTER=DEFAULT_CATALOG; try{const raw=localStorage.getItem(MASTER_LS_KEY); if(raw) MASTER=JSON.parse(raw);}catch{}
-function emojiForName(n){ if(FRUIT_EMOJI[n]) return FRUIT_EMOJI[n]; for(const b of ['native_fruits','common_fruits','edible_plants']){const h=(MASTER[b]||[]).find(x=>x.name===n); if(h&&h.emoji) return h.emoji;} return '🌱'; }
-const map=L.map('map'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map); map.setView([-33.8688,151.2093],12);
-try{const a=document.querySelector('.appbar'); if(a){L.DomEvent.disableClickPropagation(a); L.DomEvent.disableScrollPropagation(a);}}catch{}
-let clusterLayer=L.markerClusterGroup({maxClusterRadius:60}), plainLayer=L.layerGroup(); map.addLayer(clusterLayer); let useCluster=true;
-let trees=(()=>{try{return JSON.parse(localStorage.getItem(LS_KEY))||[]}catch{return[]}})(); let markerIndex=new Map();
-const locateBtn=document.getElementById('locateBtn'), addBtn=document.getElementById('addBtn'), exportBtn=document.getElementById('exportBtn'), importInput=document.getElementById('importInput'), statsBtn=document.getElementById('statsBtn'), clearBtn=document.getElementById('clearBtn'), clusterToggle=document.getElementById('clusterToggle'), catalogInput=document.getElementById('catalogInput');
-const dialogEl=document.getElementById('formDialog'), form=document.getElementById('treeForm'), formTitle=document.getElementById('formTitle'), formCategory=document.getElementById('formCategory'), fruitSelect=document.getElementById('fruitSelect'), fruitCustom=document.getElementById('fruitCustom'), season=document.getElementById('season'), ripeness=document.getElementById('ripeness'), notes=document.getElementById('notes'), lat=document.getElementById('lat'), lng=document.getElementById('lng'), photoInput=document.getElementById('photoInput'), editingId=document.getElementById('editingId');
-const fType=document.getElementById('fType'), fSeason=document.getElementById('fSeason'), fRipeness=document.getElementById('fRipeness'), fText=document.getElementById('fText'), fHasPhoto=document.getElementById('fHasPhoto'), applyFiltersBtn=document.getElementById('applyFilters'), resetFiltersBtn=document.getElementById('resetFilters');
-const filterCategory=document.getElementById('filterCategory');
-const popupTpl=document.getElementById('popupTpl'); const toastEl=document.getElementById('toast'); let toastTimer; function toast(m){toastEl.textContent=m; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2000);}
-(function(){const set=new Set(['Apple','Pear','Plum','Peach','Apricot','Orange','Lemon','Lime','Grapefruit','Mulberry','Fig','Olive','Loquat','Cherry','Banana','Mango','Guava','Feijoa','Persimmon','Pomegranate','Berry','Other']); for(const t of set){const o=document.createElement('option'); o.value=t; o.textContent=(FRUIT_EMOJI[t]||'')+' '+t; fType.appendChild(o);}})();
-function getNamesForCategory(c){const l=(MASTER[c]||[]).map(x=>x.name); return l&&l.length?l:(DEFAULT_CATALOG[c]||[]).map(x=>x.name);}
-function forceSafariRefresh(el){ if(!el) return; el.style.display='none'; void el.offsetHeight; el.style.display=''; }
-function refillFruitOptions(){ if(!fruitSelect) return; const c=formCategory?.value||'native_fruits'; const names=getNamesForCategory(c); fruitSelect.innerHTML=''; for(const t of names){const o=document.createElement('option'); o.value=t; o.textContent=`${emojiForName(t)} ${t}`; fruitSelect.appendChild(o);} const other=document.createElement('option'); other.value='Other'; other.textContent='🌱 Other (custom)'; fruitSelect.appendChild(other); fruitSelect.value=names[0]||'Other'; if(fruitCustom) fruitCustom.value=''; requestAnimationFrame(()=>{requestAnimationFrame(()=>forceSafariRefresh(fruitSelect));}); }
-['change','input','click','touchend'].forEach(e=>formCategory?.addEventListener(e,refillFruitOptions,{passive:true}));
-function saveTrees(){ localStorage.setItem(LS_KEY, JSON.stringify(trees)); }
-function buildMarker(t){ const icon=L.divIcon({className:'fruit-icon',html:`<div style="font-size:24px">${emojiForName(t.type)}</div>`,iconSize:[24,24],iconAnchor:[12,12]}); const m=L.marker([t.lat,t.lng],{icon}); m.bindPopup(renderPopup(t)); return m; }
-function passesFilters(t){ const types=Array.from(fType.selectedOptions).map(o=>o.value); if(types.length&&!types.includes(t.type))return false; if(fSeason.value&&t.season!==fSeason.value)return false; if(fRipeness.value&&t.ripeness!==fRipeness.value)return false; const q=fText.value.trim().toLowerCase(); if(q&&!(t.notes||'').toLowerCase().includes(q))return false; if(fHasPhoto.checked&&!t.photoDataUrl)return false; return true; }
-function renderAll(){ clusterLayer.clearLayers(); plainLayer.clearLayers(); markerIndex.clear(); const layer=useCluster?clusterLayer:plainLayer; if(!map.hasLayer(layer)){ map.removeLayer(useCluster?plainLayer:clusterLayer); map.addLayer(layer);} const vis=[]; for(const t of trees){ if(!passesFilters(t)) continue; const m=buildMarker(t); layer.addLayer(m); markerIndex.set(t.id,m); vis.push(t);} if(vis.length){ const g=L.featureGroup(vis.map(t=>L.marker([t.lat,t.lng]))); map.fitBounds(g.getBounds().pad(0.2),{maxZoom:17}); } }
-function renderPopup(t){ const tpl=popupTpl.content.cloneNode(true); tpl.querySelector('.emoji').textContent=emojiForName(t.type); tpl.querySelector('.name').textContent=` ${t.type}`+(t.ripeness?` • ${t.ripeness}`:''); tpl.querySelector('.coords').textContent=`${t.lat.toFixed(6)}, ${t.lng.toFixed(6)}`; const meta=[]; if(t.category) meta.push({native_fruits:'🇦🇺 Native',common_fruits:'🍊 Common',edible_plants:'🌿 Edible plant'}[t.category]||t.category); if(t.season) meta.push(t.season); meta.push(new Date(t.created).toLocaleString()); tpl.querySelector('.meta').textContent=meta.join(' • '); tpl.querySelector('.notes').textContent=t.notes||''; const wrap=tpl.querySelector('.photoWrap'); if(t.photoDataUrl){ const img=document.createElement('img'); img.src=t.photoDataUrl; wrap.appendChild(img);} const root=document.createElement('div'); root.appendChild(tpl); root.querySelector('[data-action="edit"]').addEventListener('click',()=>openEdit(t.id)); root.querySelector('[data-action="delete"]').addEventListener('click',()=>delTree(t.id)); return root; }
-async function goToMyLocation(p=false){ if(!('geolocation'in navigator)) return toast('Geolocation not available'); return new Promise(r=>{ navigator.geolocation.getCurrentPosition(pos=>{const{latitude,longitude,accuracy}=pos.coords; map.setView([latitude,longitude],Math.max(map.getZoom(),16)); if(!p) toast(`📍 Located (±${Math.round(accuracy)} m)`); r({lat:latitude,lng:longitude,accuracy});},e=>{toast('Location error: '+e.message); r(null);},{enableHighAccuracy:true,timeout:1e4,maximumAge:0});}); }
-async function openAdd(){ form.reset(); formTitle.textContent='Add Tree'; editingId.value=''; if(formCategory) formCategory.value='native_fruits'; dialogEl.showModal(); refillFruitOptions(); setTimeout(refillFruitOptions,50); const pos=await goToMyLocation(true); if(pos){lat.value=pos.lat; lng.value=pos.lng;} }
-function openEdit(id){ const t=trees.find(x=>x.id===id); if(!t) return; formTitle.textContent='Edit Tree'; editingId.value=t.id; if(formCategory) formCategory.value=t.category||'native_fruits'; dialogEl.showModal(); refillFruitOptions(); setTimeout(refillFruitOptions,50); const names=getNamesForCategory(formCategory.value); fruitSelect.value=names.includes(t.type)?t.type:'Other'; fruitCustom.value=(fruitSelect.value==='Other')?t.type:''; season.value=t.season||''; ripeness.value=t.ripeness||''; notes.value=t.notes||''; lat.value=t.lat; lng.value=t.lng; }
-function fileToDataUrl(file,maxW=1200,maxH=1200,quality=0.7){ return new Promise((res,rej)=>{ if(!file) return res(null); const r=new FileReader(); r.onload=()=>{ const img=new Image(); img.onload=()=>{ const s=Math.min(maxW/img.width,maxH/img.height,1), c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s); c.getContext('2d').drawImage(img,0,0,c.width,c.height); res(c.toDataURL('image/jpeg',quality)); }; img.onerror=rej; img.src=r.result; }; r.onerror=rej; r.readAsDataURL(file); }); }
-async function submitForm(e){ e?.preventDefault(); const id=editingId.value||crypto.randomUUID(); const type=fruitSelect.value==='Other'?(fruitCustom.value.trim()||'Other'):fruitSelect.value; const entry={id,type,category:formCategory?.value||'native_fruits',season:season.value||'',ripeness:ripeness.value||'',notes:notes.value.trim(),lat:Number(lat.value),lng:Number(lng.value),created:editingId.value?(trees.find(t=>t.id===id)?.created||Date.now()):Date.now(),photoDataUrl:undefined}; const f=photoInput.files?.[0]; if(f){ try{ entry.photoDataUrl=await fileToDataUrl(f);}catch{toast('Could not process photo');} } else if(editingId.value){ entry.photoDataUrl=(trees.find(t=>t.id===id)||{}).photoDataUrl; } const i=trees.findIndex(t=>t.id===id); if(i>=0) trees[i]=entry; else trees.push(entry); localStorage.setItem(LS_KEY,JSON.stringify(trees)); renderAll(); dialogEl.close(); toast('Saved ✅'); }
-function delTree(id){ if(!confirm('Delete this entry?')) return; trees=trees.filter(t=>t.id!==id); localStorage.setItem(LS_KEY,JSON.stringify(trees)); renderAll(); toast('Deleted'); }
-function exportGeoJSON(){ const fc={type:'FeatureCollection',features:trees.map(t=>({type:'Feature',id:t.id,properties:{type:t.type,category:t.category||null,season:t.season,ripeness:t.ripeness,notes:t.notes,created:t.created,photo:t.photoDataUrl||null},geometry:{type:'Point',coordinates:[t.lng,t.lat]}}))}; const blob=new Blob([JSON.stringify(fc,null,2)],{type:'application/geo+json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`wild-fruit-${new Date().toISOString().replace(/[:.]/g,'-')}.geojson`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),5e3); }
-function importGeoJSONFile(file){ const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(d&&d.native_fruits&&d.common_fruits&&d.edible_plants){ MASTER=d; localStorage.setItem(MASTER_LS_KEY,JSON.stringify(MASTER)); refillFruitOptions(); toast('Catalog loaded ✅'); return;} if(d.type!=='FeatureCollection') throw new Error('Not a FeatureCollection'); const imp=[]; for(const f of d.features||[]){ if(f.geometry?.type!=='Point') continue; const [lngVal,latVal]=f.geometry.coordinates||[]; const p=f.properties||{}; const e={id:f.id||crypto.randomUUID(),type:p.type||'Other',category:p.category||'native_fruits',season:p.season||'',ripeness:p.ripeness||'',notes:p.notes||'',lat:Number(latVal),lng:Number(lngVal),created:Number(p.created)||Date.now(),photoDataUrl:p.photo||null}; const i=trees.findIndex(t=>t.id===e.id); if(i>=0) trees[i]=e; else trees.push(e); imp.push(e);} localStorage.setItem(LS_KEY,JSON.stringify(trees)); renderAll(); toast(`Imported ${imp.length} point(s)`);}catch(err){ toast('Import failed: '+err.message);} }; r.readAsText(file); }
-function showStats(){ const by=trees.reduce((a,t)=>{a[t.type]=(a[t.type]||0)+1; return a;},{}); const total=trees.length; const kinds=Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}: ${v}`).join('\n'); alert(`Total trees: ${total}\n\nBy type:\n${kinds||'(none)'}`); }
-document.getElementById('popupTpl');
-locateBtn.addEventListener('click',()=>goToMyLocation()); addBtn.addEventListener('click',openAdd); exportBtn.addEventListener('click',exportGeoJSON);
-importInput.addEventListener('change',e=>{const f=e.target.files?.[0]; if(f) importGeoJSONFile(f); e.target.value='';});
-catalogInput?.addEventListener('change',e=>{const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!j.native_fruits||!j.common_fruits||!j.edible_plants) throw new Error('Invalid catalog JSON'); MASTER=j; localStorage.setItem(MASTER_LS_KEY,JSON.stringify(MASTER)); refillFruitOptions(); toast('Catalog loaded ✅'); }catch(err){ toast('Catalog load failed: '+err.message);} finally{ e.target.value=''; } }; r.readAsText(f);});
-statsBtn.addEventListener('click',showStats);
-clearBtn.addEventListener('click',()=>{ if(!confirm('Clear ALL saved entries?')) return; trees=[]; localStorage.setItem(LS_KEY,JSON.stringify(trees)); renderAll(); toast('Cleared all'); });
-applyFiltersBtn.addEventListener('click',renderAll);
-resetFiltersBtn.addEventListener('click',()=>{ fType.selectedIndex=-1; fSeason.value=''; fRipeness.value=''; fText.value=''; fHasPhoto.checked=false; renderAll(); });
-[fSeason,fRipeness,fText,fHasPhoto].forEach(el=>el.addEventListener('change',renderAll));
-clusterToggle.addEventListener('change',()=>{ useCluster=clusterToggle.checked; renderAll(); });
-document.addEventListener('DOMContentLoaded',()=>{ refillFruitOptions(); goToMyLocation(true); });
+const MASTER={
+  native_fruits:['Finger lime','Lilly Pilly','Davidson Plum'],
+  common_fruits:['Avocado','Mulberry','Loquat'],
+  edible_plants:['Wattle seed','Saltbush','Pigface']
+};
+
+let trees=[];
+
+function initMap(){
+  map=L.map('map').setView([-33.86,151.20],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
+}
+
+function refillFruitOptions(){
+  const list=MASTER[formCategory.value]||[];
+  fruitSelect.innerHTML='';
+  list.forEach(f=>{
+    const o=document.createElement('option');o.textContent=f;fruitSelect.appendChild(o);
+  });
+  const other=document.createElement('option');other.textContent='Other';fruitSelect.appendChild(other);
+}
+
+function initPickerMap(lat=-33.86,lng=151.20){
+  if(pickerMap)return;
+  pickerMap=L.map('mapPicker').setView([lat,lng],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(pickerMap);
+  pickerMarker=L.marker([lat,lng],{draggable:true}).addTo(pickerMap);
+  pickerMarker.on('dragend',()=>{
+    const p=pickerMarker.getLatLng();
+    latInput.value=p.lat.toFixed(6);
+    lngInput.value=p.lng.toFixed(6);
+  });
+  pickerMap.on('click',e=>{
+    pickerMarker.setLatLng(e.latlng);
+    latInput.value=e.latlng.lat.toFixed(6);
+    lngInput.value=e.latlng.lng.toFixed(6);
+  });
+}
+
+async function goToMyLocation(fly=false){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation)return reject();
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const lat=pos.coords.latitude,lng=pos.coords.longitude;
+      if(fly&&pickerMap){
+        pickerMap.setView([lat,lng],17);
+        pickerMarker.setLatLng([lat,lng]);
+      }
+      resolve({lat,lng});
+    },reject);
+  });
+}
+
+addressSearch.addEventListener('change',async()=>{
+  const q=addressSearch.value.trim();
+  if(!q)return;
+  const url=`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`;
+  const res=await fetch(url);const data=await res.json();
+  if(data&&data[0]){
+    const {lat,lon}=data[0];
+    pickerMap.setView([lat,lon],16);
+    pickerMarker.setLatLng([lat,lon]);
+    latInput.value=parseFloat(lat).toFixed(6);
+    lngInput.value=parseFloat(lon).toFixed(6);
+  }
+});
+
+useMyLocBtn.addEventListener('click',async()=>{
+  const pos=await goToMyLocation(true);
+  if(pos){
+    latInput.value=pos.lat.toFixed(6);
+    lngInput.value=pos.lng.toFixed(6);
+  }
+});
+
+addBtn.addEventListener('click',()=>{
+  form.reset();
+  dialogEl.showModal();
+  refillFruitOptions();
+  setTimeout(()=>initPickerMap(),300);
+});
+
+cancelBtn.addEventListener('click',()=>dialogEl.close());
+
+form.addEventListener('submit',e=>{
+  e.preventDefault();
+  const entry={
+    id:Date.now(),
+    type:fruitSelect.value==='Other'?fruitCustom.value:fruitSelect.value,
+    category:formCategory.value,
+    lat:parseFloat(latInput.value),
+    lng:parseFloat(lngInput.value),
+    notes:notes.value
+  };
+  trees.push(entry);
+  L.marker([entry.lat,entry.lng]).addTo(map).bindPopup(`<b>${entry.type}</b><br>${entry.notes}`);
+  dialogEl.close();
+});
+
+formCategory.addEventListener('change',refillFruitOptions);
+
+window.addEventListener('load',initMap);
